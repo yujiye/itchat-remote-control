@@ -17,7 +17,7 @@ python itchat.py
 ```
 or
 ```
-pip3 itchat.py
+python3 itchat.py
 ```
 ## 程序说明
 ### 私聊
