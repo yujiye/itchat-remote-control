@@ -144,7 +144,7 @@ def update_function():
                 url=msg['Url']
                 itchat.send(msg=content+'\n'+url, toUserName=account2_id)
                 return 
-            content='收到来自%s 的%s 类型消息，请前往大号查看。'%(get_name(msg['FromUserName']),msg['Type'])
+            content='收到来自%s 的%s 类型消息，请前往账号1查看。'%(get_name(msg['FromUserName']),msg['Type'])
             itchat.send(msg=content, toUserName=account2_id)
                     
 
@@ -155,7 +155,7 @@ def update_function():
         global chat_namelist_index
 
         if msg['FromUserName'] in[account1_id,account2_id]:
-        #处理来自大号或者小号自身消息
+        #处理来自账号1或者账号2自身消息
             if False:
                 #开启或者关闭系统
                 # if  msg['FromUserName'] in[]:
@@ -276,7 +276,7 @@ def update_function():
 
                         return 
 
-                    #使用小号回复消息
+                    #使用账号2回复消息
                     #常用聊天模式
                     if "@" == text[0]:
                         content=text[1:]
@@ -284,7 +284,7 @@ def update_function():
                         print(content+' --> '+recent_name_list[chat_namelist_index])
                         itchat.send(msg=content, toUserName=to_id)
 
-                    #使用小号回复消息
+                    #使用账号2回复消息
                     #指定用户名模式
                     if '--' in text and '群聊' !=text[:2]:
                         name=text.split('--')[0]
@@ -299,7 +299,7 @@ def update_function():
 
 
         else:
-        #处理不来自大号或者小号自身消息
+        #处理不来自账号1或者账号2自身消息
             
             text=msg['Text']
             from_id=msg['FromUserName']
@@ -310,7 +310,7 @@ def update_function():
                 recent_name_list.append(from_name)
                 write_pkl(recent_name_list,'recent_name_list.pkl')
 
-            #转发收到的消息到 小号
+            #转发收到的消息到 账号2
             send_txt=from_name+'--'+text
             print(from_name+' --> '+text)
             itchat.send(msg=(from_name+'--'+text), toUserName=account2_id)
@@ -321,7 +321,7 @@ def update_function():
         global recent_name_list
         global chat_namelist_index
 
-        #处理不来自大号和小号的附件信息
+        #处理不来自账号1和账号2的附件信息
         if msg['FromUserName'] not in[account1_id,account2_id]:
             msg['Text'](os.getcwd()+'/tempdata/'+msg['FileName'])
             content='来自%s 的附件'%(get_name(msg['FromUserName']))
@@ -340,7 +340,7 @@ def update_function():
     @itchat.msg_register(TEXT, isGroupChat=True)
     def group_reply(msg):
         global keywords
-        #不能使用大号回复内容
+        #不能使用账号1回复内容
         from_userid=msg['ActualUserName']
         room_id=msg['FromUserName']
         content=msg['Content']
