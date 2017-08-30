@@ -21,7 +21,6 @@ def write_pkl(var, filepath):
     print('writing to ' + filepath)
     output.close()
 
-
 def load_pkl(filepath):
     """
     读取pkl到变量
@@ -31,7 +30,6 @@ def load_pkl(filepath):
     output.close()
     return var
 
-
 def get_name(id):
     """利用 id 返回备注或者昵称"""
     user=itchat.search_friends(userName=id)
@@ -39,6 +37,7 @@ def get_name(id):
         return user['RemarkName']
     else:
         return user['NickName']
+
 def get_id(NAME):
     """利用 昵称返回 id"""
     return itchat.search_friends(name=NAME)[0]['UserName']
@@ -77,11 +76,12 @@ def search_byfirst(txt):
 def write_sub(room_id,from_user_name,content,msgtime):
     ###存储历史chatroom###
     input=open('room_history.txt','a',encoding='utf-8')
+    content=content.replace('\n',' ')
     input.write(room_id+'##$##'+from_user_name+'##$##'+content+'##$##'+msgtime+'\n')
     input.close()
 
 def get_all_active_room():
-    """获取所有在 roomhistory 中记录了的 roomid,roomname"""
+    """获取所有在 roomhistory 中记录了的 roomname"""
     input=open('room_history.txt','r',encoding='utf-8')
     room_name_list=[]
     for line in input:
@@ -113,12 +113,26 @@ def get_room_chat_history(index):
     input.close()
     outputfile.close()
 
+def send_new_callormessege():
+    #发送文件中的信息
+    input=open('tempdata/new_message','r',encoding='utf-8')
+    line=input.readline().strip()
+    input.close()
+    os.remove('tempdata/new_message')
+    type=line.split('##$##')[0]
+    if type=='call':
+        name,number,date,time=line.split('##$##')[1:5]
+        content='收到 %s 的未接电话 %s ( %s  %s )'%(name,number,date,time)
+        itchat.send(msg=content, toUserName=account2_id)
+    if type=='message':
+        name,number,text,time=line.split('##$##')[1:5]
+        content='收到 %s :%s 的短信( %s )\n 正文: %s'%(name,number,time,text)
+        itchat.send(msg=content, toUserName=account2_id)
+
 def update_function():
     """
     微信动态注册消息
     """
-
-
     @itchat.msg_register([MAP,CARD,SHARING,FRIENDS,NOTE], isGroupChat=False)
     def general_reply(msg):
         if msg['FromUserName'] not in[account1_id]:
@@ -134,7 +148,7 @@ def update_function():
                     itchat.send(msg=content+'\n'+url, toUserName=account2_id)
                     return 
                 if msg['AppMsgType']== 3:
-                #非音乐链接
+                #音乐链接
                     content='收到%s 的分享音乐 %s '%(get_name(msg['FromUserName']),msg['FileName'])
                     url=msg['Url']
                     itchat.send(msg=content+'\n'+url, toUserName=account2_id)
@@ -330,27 +344,26 @@ def update_function():
                          os.getcwd()+'/tempdata/'+msg['FileName']), account2_id)
             print('收到'+content)
         else:
-        #转发出其他信息
-        #只能使用常用聊天模式
-            # print(msg) 
-            msg['Text'](os.getcwd()+'/tempdata/'+msg['FileName'])
-            itchat.send('@%s@%s'%('img' if msg['Type'] == 'Picture' else 'fil',\
-                         os.getcwd()+'/tempdata/'+msg['FileName']), get_id(recent_name_list[chat_namelist_index]))
+            if msg['FromUserName'] ==account2_id:
+            #转发出其他信息
+            #只能使用常用聊天模式
+                msg['Text'](os.getcwd()+'/tempdata/'+msg['FileName'])
+                itchat.send('@%s@%s'%('img' if msg['Type'] == 'Picture' else 'fil',\
+                             os.getcwd()+'/tempdata/'+msg['FileName']), get_id(recent_name_list[chat_namelist_index]))
 
     @itchat.msg_register(TEXT, isGroupChat=True)
     def group_reply(msg):
         global keywords
-        #不能使用账号1回复内容
+        global keyroomnames
         from_userid=msg['ActualUserName']
         room_id=msg['FromUserName']
         content=msg['Content']
         isat=msg['IsAt']
         msgtime=time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))
-        # print(msg)
         if from_userid !=account1_id:
             room_name=itchat.search_chatrooms(userName=room_id)['NickName']
             from_user_name=get_name(from_userid)
-            if isat or any(_ in content for _ in keywords):
+            if isat or any(_ in content for _ in keywords) or room_name in keyroomnames:
                 itchat.send('群 %s: %s --> %s' % (room_name, from_user_name,content), account2_id)
                 print('群 %s: %s --> %s' % (room_name, from_user_name,content))
                 write_sub(room_name,from_user_name,content,msgtime)
@@ -362,36 +375,71 @@ def update_function():
             from_user_name='我自己'
             write_sub(room_name,from_user_name,content,msgtime)
 
+    @itchat.msg_register([MAP,CARD,SHARING,FRIENDS,NOTE], isGroupChat=True)
+    def general_reply(msg):
+        global keyroomnames
+        from_userid=msg['ActualUserName']
+        room_id=msg['FromUserName']
+        if from_userid !=account1_id:
+            room_name=itchat.search_chatrooms(userName=room_id)['NickName']
+            from_user_name=get_name(from_userid)
+            if msg['Type']=='Note' and any(s in msg['Text'] for s in (u'红包', u'转账')) :
+                pass
+                return
+            if msg['Type']=='Sharing':
+                if msg['AppMsgType']== 5:
+                #非音乐链接
+                    content='群%s 收到%s 的分享链接 %s '%(room_name,from_user_name,msg['Text'])
+                    url=msg['Url']
+                    itchat.send(msg=content+'\n'+url, toUserName=account2_id)
+                    return 
+                if msg['AppMsgType']== 3:
+                #音乐链接
+                    content='群%s 收到%s 的分享音乐 %s '%(room_name,from_user_name,msg['FileName'])
+                    url=msg['Url']
+                    itchat.send(msg=content+'\n'+url, toUserName=account2_id)
+                    return 
+            if msg['Type']=='Map':
+                content='群%s 收到%s 的地图分享 %s '%(room_name,from_user_name,msg['Text'])
+                url=msg['Url']
+                itchat.send(msg=content+'\n'+url, toUserName=account2_id)
+                return 
+
 if __name__ == '__main__':
     # 初始操作
     
     # itchat
     itchat.auto_login(hotReload=True)
-    # itchat.auto_login(hotReload=-1)
-
-    # itchat.auto_login()
     itchat.dump_login_status()
     thread.start_new_thread(itchat.run, ())
 
+    #用户设置
+    account2_name='黎城'
+    keywords='关键词 关键词 关键词'.split(' ')
+    keyroomnames=[]
 
+    #itchat 初始化
+    account1_id = itchat.search_friends()['UserName']
+    account2_id=itchat.search_friends(name=account2_name)[0]['UserName']
     if not os.path.exists(os.getcwd()+'/room_history.txt'):
         os.mknod("room_history.txt")
     recent_name_list=[]
+
+    chat_namelist_index=0 #选择常用用户模式下index
     if os.path.exists(os.getcwd()+'/recent_name_list.pkl'):
         recent_name_list=load_pkl('recent_name_list.pkl')
-    chat_namelist_index=0 #选择常用用户模式下index
+        itchat.send(msg='微信代理开始,当前聊天对象%s'%(recent_name_list[chat_namelist_index]), toUserName=account2_id)
 
-    # itchatID设置
-    account2_name='昵称'
-    account1_id = itchat.search_friends()['UserName']
-    account2_id=itchat.search_friends(name=account2_name)[0]['UserName']
-    keywords='关键词 关键词 关键词'.split(' ')
 
     while 1:
+        #检测未接电话和信息
+        if os.path.exists('tempdata/new_message'):
+            send_new_callormessege()
+
         #每半小时发送 心跳消息检测是否正常
         localtime = time.localtime(time.time())
         if localtime.tm_min in [0,30] and localtime.tm_hour>= 7 and localtime.tm_sec in [0,1]:
-            itchat.send(msg='网页微信运行正常(%d:%d)'%(localtime.tm_hour,localtime.tm_min), toUserName=account2_id)
+            itchat.send(msg='微信代理正常(%d:%d),当前聊天对象%s'%(localtime.tm_hour,localtime.tm_min,recent_name_list[chat_namelist_index]), toUserName=account2_id)
             time.sleep(1)
 
         update_function()
